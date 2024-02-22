@@ -82,6 +82,20 @@ async function run() {
         continue;
       }
 
+      const { data: { artifacts: to_del_artifacts } } = await octokit.actions.listWorkflowRunArtifacts({
+          owner: repo_owner,
+          repo: repo_name,
+          run_id: del.id
+      });
+      for (const del_artifact of to_del_artifacts) {
+          await octokit.actions.deleteArtifact({
+            owner: repo_owner,
+            repo: repo_name,
+            artifact_id: del_artifact.id
+          });
+          console.log(`🚀 Delete artifact ${del_artifact.id} of run ${del.id}`);
+      }
+
       await octokit.actions.deleteWorkflowRun({
         owner: repo_owner,
         repo: repo_name,
@@ -184,6 +198,20 @@ async function run() {
           if (dry_run) {
             console.log(`[dry-run] 🚀 Delete run ${del.id} of '${workflow.name}' workflow`);
             continue;
+          }
+
+          const { data: { artifacts: to_del_artifacts } } = await octokit.actions.listWorkflowRunArtifacts({
+              owner: repo_owner,
+              repo: repo_name,
+              run_id: del.id
+          });
+          for (const del_artifact of to_del_artifacts) {
+              await octokit.actions.deleteArtifact({
+                owner: repo_owner,
+                repo: repo_name,
+                artifact_id: del_artifact.id
+              });
+              console.log(`🚀 Delete artifact ${del_artifact.id} of run ${del.id}`);
           }
 
           await octokit.actions.deleteWorkflowRun({
