@@ -133,8 +133,7 @@ async function run() {
     console.log(`💬 found total of ${workflows.length} workflow(s)`);
     for (const workflow of workflows) {
       core.debug(`Workflow: ${workflow.name} ${workflow.id} ${workflow.state}`);
-      let del_runs = new Array();
-      let Skip_runs = new Array();
+      let del_runs = [];
       // Execute the API "List workflow runs for a repository", see 'https://octokit.github.io/rest.js/v18#actions-list-workflow-runs-for-repo'
       const runs = await octokit
         .paginate("GET /repos/:owner/:repo/actions/workflows/:workflow_id/runs", {
@@ -143,10 +142,19 @@ async function run() {
           workflow_id: workflow.id
         });
 
-      for (const run of runs) {
+      let total_runs = runs.sort((a, b) => { return new Date(a.created_at) - new Date(b.created_at); });
+      if (keep_minimum_runs > 0) {
+        let skipped = total_runs.slice(-keep_minimum_runs);
+        for (const Skipped of skipped) {
+          console.log(`👻 Skipped '${workflow.name}' workflow run id: ${Skipped.id}, status ${Skipped.status}, created at ${Skipped.created_at}`);
+        }
+        total_runs = total_runs.slice(0, -keep_minimum_runs)
+      }
+
+      for (const run of total_runs) {
         core.debug(`Run: '${workflow.name}' workflow run ${run.id} (status=${run.status})`)
 
-        if (run.status !== "completed") {
+        if (run.status === 'in_progress') {
           console.log(`👻 Skipped '${workflow.name}' workflow run ${run.id}: it is in '${run.status}' state`);
           continue;
         }
@@ -171,7 +179,7 @@ async function run() {
         const current = new Date();
         const ELAPSE_ms = current.getTime() - created_at.getTime();
         const ELAPSE_days = ELAPSE_ms / (1000 * 3600 * 24);
-        if (ELAPSE_days >= retain_days) {
+        if (keep_minimum_runs > 0 || ELAPSE_days >= retain_days) {
           core.debug(`  Added to del list '${workflow.name}' workflow run ${run.id}`);
           del_runs.push(run);
         }
@@ -180,16 +188,7 @@ async function run() {
         }
       }
       core.debug(`Delete list for '${workflow.name}' is ${del_runs.length} items`);
-      const arr_length = del_runs.length - keep_minimum_runs;
-      if (arr_length > 0) {
-        del_runs = del_runs.sort((a, b) => { return a.id - b.id; });
-        if (keep_minimum_runs !== 0) {
-          Skip_runs = del_runs.slice(-keep_minimum_runs);
-          del_runs = del_runs.slice(0, -keep_minimum_runs);
-          for (const Skipped of Skip_runs) {
-            console.log(`👻 Skipped '${workflow.name}' workflow run ${Skipped.id}: created at ${Skipped.created_at}`);
-          }
-        }
+      if (del_runs.length > 0) {
         core.debug(`Deleting ${del_runs.length} runs for '${workflow.name}' workflow`);
         for (const del of del_runs) {
           core.debug(`Deleting '${workflow.name}' workflow run ${del.id}`);
@@ -222,7 +221,6 @@ async function run() {
 
           console.log(`🚀 Delete run ${del.id} of '${workflow.name}' workflow`);
         }
-        console.log(`✅ ${arr_length} runs of '${workflow.name}' workflow deleted.`);
       }
     }
   }

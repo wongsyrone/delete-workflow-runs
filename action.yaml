@@ -19,7 +19,7 @@ inputs:
     default: ${{ github.repository }}
 
   retain_days:
-    description: 'Days-worth of runs to keep for each workflow'
+    description: 'Days-worth of runs to keep for each workflow  Ignored when keep_minimum_runs > 0'
     required: true
     default: 30
 
